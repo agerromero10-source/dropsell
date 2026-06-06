@@ -10,15 +10,17 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Rutas de datos
 const PRODUCTS_FILE = path.join(__dirname, 'data/products.json');
 const ORDERS_FILE = path.join(__dirname, 'data/orders.json');
 const USERS_FILE = path.join(__dirname, 'data/users.json');
+const REVIEWS_FILE = path.join(__dirname, 'data/reviews.json');
 
-// Configurar Nodemailer para emails
+// Configurar Nodemailer
 let transporter = null;
 if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
   transporter = nodemailer.createTransport({
@@ -29,20 +31,22 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
     }
   });
   console.log('✅ Email service configurado');
-} else {
-  console.log('⚠️ Email service no configurado (variables de entorno faltantes)');
 }
 
 // Crear archivos si no existen
 function ensureDataFiles() {
   if (!fs.existsSync(PRODUCTS_FILE)) {
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify([
-      { id: uuidv4(), name: "Spin Racer Pro", price: 12.99, image: "🎯", description: "Spinner metálico premium", stock: 50 },
-      { id: uuidv4(), name: "Gear Mesh", price: 14.99, image: "⚙️", description: "Engranajes con giro suave", stock: 45 },
-      { id: uuidv4(), name: "Magnet Click", price: 13.49, image: "🧲", description: "Clicks magnéticos satisfactorios", stock: 60 },
-      { id: uuidv4(), name: "Pop-It Metal", price: 11.99, image: "🔷", description: "Burbujas de acero inoxidable", stock: 55 },
-      { id: uuidv4(), name: "Chain Fidget", price: 10.99, image: "✦", description: "Cadena articulada fluida", stock: 40 },
-      { id: uuidv4(), name: "Zen Click", price: 9.99, image: "◈", description: "Mecanismo de clicker satisfactorio", stock: 70 }
+      { 
+        id: uuidv4(), 
+        name: "Spin Racer Pro", 
+        price: 12.99, 
+        image: "https://via.placeholder.com/300?text=Spin+Racer", 
+        description: "Spinner metálico premium", 
+        stock: 50,
+        avgRating: 0,
+        reviewCount: 0
+      }
     ], null, 2));
   }
   if (!fs.existsSync(ORDERS_FILE)) {
@@ -52,6 +56,9 @@ function ensureDataFiles() {
     fs.writeFileSync(USERS_FILE, JSON.stringify([
       { username: "admin", password: "admin123", role: "admin" }
     ], null, 2));
+  }
+  if (!fs.existsSync(REVIEWS_FILE)) {
+    fs.writeFileSync(REVIEWS_FILE, JSON.stringify([], null, 2));
   }
 }
 
@@ -66,12 +73,9 @@ function writeJSON(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-// 📧 Función para enviar email al admin (nueva compra)
+// 📧 Función para enviar email al admin
 async function sendAdminNotification(order) {
-  if (!transporter) {
-    console.log('⚠️ Email no configurado, saltando notificación al admin');
-    return;
-  }
+  if (!transporter) return;
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -93,11 +97,6 @@ async function sendAdminNotification(order) {
           <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <h3 style="color: #333; margin-top: 0;">Productos Comprados</h3>
             <table style="width: 100%; border-collapse: collapse;">
-              <tr style="background: #f0f0f0;">
-                <th style="text-align: left; padding: 10px; border-bottom: 1px solid #ddd;">Producto</th>
-                <th style="text-align: center; padding: 10px; border-bottom: 1px solid #ddd;">Cantidad</th>
-                <th style="text-align: right; padding: 10px; border-bottom: 1px solid #ddd;">Precio</th>
-              </tr>
               ${order.items.map(item => `
                 <tr>
                   <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.name}</td>
@@ -116,15 +115,7 @@ async function sendAdminNotification(order) {
           
           <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
             <p style="margin: 0; color: #856404;">
-              <strong>⚠️ ACCIÓN REQUERIDA:</strong> Ve a tu panel admin para procesar esta compra y realizar el pedido al proveedor.
-            </p>
-          </div>
-          
-          <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; color: #666; font-size: 12px;">
-            <p style="margin: 0;">
-              <strong>ID de Orden:</strong> ${order.id}<br>
-              <strong>ID PayPal:</strong> ${order.paypalTransactionId}<br>
-              <strong>Fecha:</strong> ${new Date(order.createdAt).toLocaleString('es-ES')}
+              <strong>⚠️ ACCIÓN REQUERIDA:</strong> Ve a tu panel admin para procesar esta compra.
             </p>
           </div>
         </div>
@@ -140,12 +131,9 @@ async function sendAdminNotification(order) {
   }
 }
 
-// 📧 Función para enviar email al cliente (pedido enviado)
+// 📧 Función para enviar email al cliente
 async function sendShippingNotification(order) {
-  if (!transporter) {
-    console.log('⚠️ Email no configurado, saltando notificación al cliente');
-    return;
-  }
+  if (!transporter) return;
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -168,11 +156,6 @@ async function sendShippingNotification(order) {
           <div style="background: #f0f8f5; padding: 20px; border-radius: 5px; margin: 30px 0; border-left: 4px solid #28a745;">
             <h3 style="color: #28a745; margin-top: 0;">Detalles de tu Pedido</h3>
             <table style="width: 100%; border-collapse: collapse;">
-              <tr style="background: #e8f5e9;">
-                <th style="text-align: left; padding: 10px; border-bottom: 1px solid #ddd;">Producto</th>
-                <th style="text-align: center; padding: 10px; border-bottom: 1px solid #ddd;">Cantidad</th>
-                <th style="text-align: right; padding: 10px; border-bottom: 1px solid #ddd;">Precio</th>
-              </tr>
               ${order.items.map(item => `
                 <tr>
                   <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.name}</td>
@@ -193,28 +176,6 @@ async function sendShippingNotification(order) {
             <p style="margin: 0; color: #e65100;">
               <strong>📮 Dirección de entrega:</strong><br>
               ${order.address || 'Dirección no proporcionada'}
-            </p>
-          </div>
-          
-          <div style="margin: 30px 0; padding: 20px; background: #f9f9f9; border-radius: 5px;">
-            <h3 style="color: #333; margin-top: 0;">¿Preguntas?</h3>
-            <p style="color: #666; margin-bottom: 0;">
-              Si tienes alguna pregunta sobre tu pedido, responde a este email o contacta con nuestro soporte.
-            </p>
-          </div>
-          
-          <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; color: #666; font-size: 12px;">
-            <p style="margin: 0;">
-              <strong>Número de Orden:</strong> ${order.id}<br>
-              <strong>Factura:</strong> ${order.invoiceNumber}<br>
-              <strong>Fecha de Envío:</strong> ${new Date().toLocaleString('es-ES')}
-            </p>
-          </div>
-          
-          <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px;">
-            <p style="margin: 0;">
-              © 2026 DropShell. Todos los derechos reservados.<br>
-              <a href="https://dropsell.pages.dev" style="color: #ffd700; text-decoration: none;">Visita nuestra tienda</a>
             </p>
           </div>
         </div>
@@ -279,10 +240,55 @@ app.post('/api/orders', (req, res) => {
   writeJSON(ORDERS_FILE, orders);
   writeJSON(PRODUCTS_FILE, products);
   
-  // 📧 Enviar email al admin
   sendAdminNotification(newOrder);
   
   res.json({ ok: true, order: newOrder });
+});
+
+// GET Reseñas de producto
+app.get('/api/reviews/:productId', (req, res) => {
+  const reviews = readJSON(REVIEWS_FILE);
+  const productReviews = reviews
+    .filter(r => r.productId === req.params.productId)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json(productReviews);
+});
+
+// POST Crear reseña
+app.post('/api/reviews', (req, res) => {
+  const { productId, name, rating, text } = req.body;
+  
+  if (!productId || !name || !rating || !text) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  
+  const reviews = readJSON(REVIEWS_FILE);
+  const products = readJSON(PRODUCTS_FILE);
+  
+  const newReview = {
+    id: uuidv4(),
+    productId,
+    name,
+    rating: Math.min(5, Math.max(1, parseInt(rating))),
+    text,
+    createdAt: new Date().toISOString()
+  };
+  
+  reviews.push(newReview);
+  writeJSON(REVIEWS_FILE, reviews);
+  
+  // Actualizar rating promedio del producto
+  const productReviews = reviews.filter(r => r.productId === productId);
+  const avgRating = productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length;
+  
+  const product = products.find(p => p.id === productId);
+  if (product) {
+    product.avgRating = avgRating;
+    product.reviewCount = productReviews.length;
+    writeJSON(PRODUCTS_FILE, products);
+  }
+  
+  res.json({ ok: true, review: newReview });
 });
 
 // ===== RUTAS ADMIN =====
@@ -310,7 +316,7 @@ app.post('/api/admin/login', (req, res) => {
   }
 });
 
-// GET Órdenes (Admin)
+// GET Órdenes
 app.get('/api/admin/orders', adminAuth, (req, res) => {
   const orders = readJSON(ORDERS_FILE);
   res.json(orders);
@@ -327,7 +333,6 @@ app.put('/api/admin/orders/:id', adminAuth, (req, res) => {
   order.status = status;
   writeJSON(ORDERS_FILE, orders);
   
-  // 📧 Si se marca como enviado, enviar email al cliente
   if (status === 'shipped' || status === 'sent' || status === 'delivery') {
     sendShippingNotification(order);
   }
@@ -335,7 +340,7 @@ app.put('/api/admin/orders/:id', adminAuth, (req, res) => {
   res.json({ ok: true, order });
 });
 
-// GET Dashboard stats (Admin)
+// GET Dashboard stats
 app.get('/api/admin/stats', adminAuth, (req, res) => {
   const orders = readJSON(ORDERS_FILE);
   const products = readJSON(PRODUCTS_FILE);
@@ -352,7 +357,7 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
   });
 });
 
-// POST Crear producto (Admin)
+// POST Crear producto
 app.post('/api/admin/products', adminAuth, (req, res) => {
   const { name, price, image, description, stock } = req.body;
   const products = readJSON(PRODUCTS_FILE);
@@ -364,6 +369,8 @@ app.post('/api/admin/products', adminAuth, (req, res) => {
     image,
     description,
     stock,
+    avgRating: 0,
+    reviewCount: 0,
     createdAt: new Date().toISOString()
   };
   
@@ -372,7 +379,7 @@ app.post('/api/admin/products', adminAuth, (req, res) => {
   res.json({ ok: true, product: newProduct });
 });
 
-// PUT Actualizar producto (Admin)
+// PUT Actualizar producto
 app.put('/api/admin/products/:id', adminAuth, (req, res) => {
   const { name, price, image, description, stock } = req.body;
   const products = readJSON(PRODUCTS_FILE);
@@ -385,7 +392,7 @@ app.put('/api/admin/products/:id', adminAuth, (req, res) => {
   res.json({ ok: true, product });
 });
 
-// DELETE Eliminar producto (Admin)
+// DELETE Eliminar producto
 app.delete('/api/admin/products/:id', adminAuth, (req, res) => {
   const products = readJSON(PRODUCTS_FILE);
   const filtered = products.filter(p => p.id !== req.params.id);
@@ -393,7 +400,7 @@ app.delete('/api/admin/products/:id', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// GET Descargar factura (Admin)
+// GET Descargar factura
 app.get('/api/admin/invoice/:id', adminAuth, (req, res) => {
   const orders = readJSON(ORDERS_FILE);
   const order = orders.find(o => o.id === req.params.id);
@@ -432,6 +439,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 DropShell Backend corriendo en puerto ${PORT}`);
-  console.log(`📊 Admin en: http://localhost:${PORT}/admin.html`);
   console.log(`💼 API en: http://localhost:${PORT}/api`);
 });
