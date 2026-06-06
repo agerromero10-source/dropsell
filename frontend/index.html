@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DropShell - Fidget Toys Premium</title>
-  <script src="https://www.paypal.com/sdk/js?client-id=AdG2kLlnPWiUZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ&currency=EUR"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=AdG2kLlnPWiUZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ&currency=EUR"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
@@ -179,6 +179,8 @@
       justify-content: center;
       margin-bottom: 20px;
       font-size: 80px;
+      background-size: cover;
+      background-position: center;
     }
     
     .product-name {
@@ -192,6 +194,12 @@
       font-size: 14px;
       color: #888;
       margin-bottom: 15px;
+    }
+    
+    .product-rating {
+      font-size: 14px;
+      color: #ffd700;
+      margin-bottom: 10px;
     }
     
     .product-price {
@@ -217,6 +225,7 @@
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
+      margin-bottom: 10px;
     }
     
     .add-to-cart-btn:hover {
@@ -226,6 +235,23 @@
     .add-to-cart-btn:disabled {
       background: #666;
       cursor: not-allowed;
+    }
+    
+    .reviews-btn {
+      width: 100%;
+      background: #333;
+      color: #ffd700;
+      padding: 10px;
+      border: 1px solid #ffd700;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .reviews-btn:hover {
+      background: #ffd700;
+      color: #0a0a0a;
     }
     
     /* MODAL */
@@ -376,7 +402,7 @@
       font-weight: 600;
     }
     
-    .form-group input {
+    .form-group input, .form-group textarea {
       width: 100%;
       padding: 12px;
       background: #2a2a2a;
@@ -384,15 +410,98 @@
       border-radius: 4px;
       color: #ffffff;
       font-size: 14px;
+      font-family: inherit;
     }
     
-    .form-group input:focus {
+    .form-group input:focus, .form-group textarea:focus {
       outline: none;
       border-color: #ffd700;
     }
     
     #paypal-button-container {
       margin-top: 30px;
+    }
+    
+    /* RESEÑAS */
+    .reviews-section {
+      margin-top: 30px;
+    }
+    
+    .reviews-section h3 {
+      color: #ffd700;
+      margin-bottom: 20px;
+    }
+    
+    .review-form {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    
+    .review-form label {
+      display: block;
+      color: #fff;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+    
+    .stars {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .star-btn {
+      background: #444;
+      border: none;
+      color: #ffd700;
+      font-size: 24px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .star-btn:hover, .star-btn.active {
+      background: #ffd700;
+      color: #0a0a0a;
+    }
+    
+    .review-item {
+      background: #2a2a2a;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      border-left: 4px solid #ffd700;
+    }
+    
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    
+    .review-author {
+      font-weight: 600;
+      color: #fff;
+    }
+    
+    .review-rating {
+      color: #ffd700;
+      font-weight: 600;
+    }
+    
+    .review-text {
+      color: #bbb;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    
+    .review-date {
+      color: #666;
+      font-size: 12px;
+      margin-top: 10px;
     }
     
     footer {
@@ -529,6 +638,20 @@
   </div>
 </div>
 
+<!-- MODAL RESEÑAS -->
+<div class="modal" id="reviewsModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Reseñas de Productos</h2>
+      <button class="close-btn" onclick="closeReviews()">×</button>
+    </div>
+    
+    <div id="reviewsContent">
+      <!-- Cargado dinámicamente -->
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ADMIN -->
 <div class="modal" id="adminModal">
   <div class="modal-content">
@@ -571,12 +694,13 @@
 
 <script>
 // CONFIG
-const API_URL = 'https://dropsell.onrender.com';
-const PAYPAL_CLIENT_ID = 'AdG2kLlnPWiUZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ'; // Reemplazar con tu ID real
+const API_URL = window.location.origin;
+const PAYPAL_CLIENT_ID = 'AdG2kLlnPWiUZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ';
 
 let cart = [];
 let adminToken = null;
 let shippingCost = 5;
+let currentProductForReview = null;
 
 // Inicializar
 async function init() {
@@ -593,14 +717,16 @@ async function loadProducts() {
     const grid = document.getElementById('products-grid');
     grid.innerHTML = products.map(p => `
       <div class="product-card">
-        <div class="product-image">${p.image}</div>
+        <div class="product-image" style="background-image: url('${p.image}'); background-color: #2a2a2a;"></div>
         <div class="product-name">${p.name}</div>
         <div class="product-desc">${p.description}</div>
+        ${p.avgRating ? `<div class="product-rating">⭐ ${p.avgRating.toFixed(1)}/5 (${p.reviewCount || 0} reseñas)</div>` : ''}
         <div class="product-price">€${p.price.toFixed(2)}</div>
         <div class="product-stock">Stock: ${p.stock}</div>
         <button class="add-to-cart-btn" ${p.stock === 0 ? 'disabled' : ''} onclick="addToCart('${p.id}', '${p.name}', ${p.price}, ${p.stock})">
           ${p.stock === 0 ? 'Agotado' : 'Añadir al carrito'}
         </button>
+        <button class="reviews-btn" onclick="openReviews('${p.id}', '${p.name}')">Ver reseñas & opinar</button>
       </div>
     `).join('');
   } catch (e) {
@@ -698,7 +824,7 @@ function updateCartSummary() {
 function openCheckout() {
   closeCart();
   document.getElementById('checkoutModal').classList.add('active');
-  initPayPal();
+  setTimeout(() => initPayPal(), 500);
 }
 
 function closeCheckout() {
@@ -709,6 +835,10 @@ function closeCheckout() {
 function initPayPal() {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + shippingCost;
+  
+  // Limpiar contenedor anterior
+  const container = document.getElementById('paypal-button-container');
+  container.innerHTML = '';
   
   paypal.Buttons({
     createOrder: (data, actions) => {
@@ -761,10 +891,107 @@ function initPayPal() {
         alert('Error al procesar el pedido: ' + e.message);
       }
     },
-    onError: () => {
+    onError: (err) => {
+      console.error('PayPal error:', err);
       alert('Error en el pago. Por favor intenta de nuevo.');
     }
   }).render('#paypal-button-container');
+}
+
+// RESEÑAS
+async function openReviews(productId, productName) {
+  currentProductForReview = { id: productId, name: productName };
+  document.getElementById('reviewsModal').classList.add('active');
+  loadReviews(productId);
+}
+
+function closeReviews() {
+  document.getElementById('reviewsModal').classList.remove('active');
+  currentProductForReview = null;
+}
+
+async function loadReviews(productId) {
+  try {
+    const res = await fetch(`${API_URL}/api/reviews/${productId}`);
+    const reviews = await res.json();
+    
+    let html = `
+      <div class="review-form">
+        <h3>Deja tu reseña</h3>
+        <div class="form-group">
+          <label>Tu nombre</label>
+          <input type="text" id="reviewName" placeholder="Tu nombre">
+        </div>
+        <div class="form-group">
+          <label>Puntuación</label>
+          <div class="stars">
+            ${[1,2,3,4,5].map(i => `<button class="star-btn" onclick="selectStar(${i})">★</button>`).join('')}
+          </div>
+          <input type="hidden" id="selectedRating" value="5">
+        </div>
+        <div class="form-group">
+          <label>Tu opinión</label>
+          <textarea id="reviewText" placeholder="Cuéntanos tu experiencia..." rows="4" style="resize: vertical;"></textarea>
+        </div>
+        <button class="btn" style="width: 100%;" onclick="submitReview('${productId}')">Enviar reseña</button>
+      </div>
+      
+      <div class="reviews-section">
+        <h3>Reseñas de clientes</h3>
+        ${reviews.length === 0 ? '<p style="color: #888;">No hay reseñas aún. ¡Sé el primero!</p>' : ''}
+        ${reviews.map(r => `
+          <div class="review-item">
+            <div class="review-header">
+              <span class="review-author">${r.name}</span>
+              <span class="review-rating">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+            </div>
+            <div class="review-text">${r.text}</div>
+            <div class="review-date">${new Date(r.createdAt).toLocaleDateString('es-ES')}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    document.getElementById('reviewsContent').innerHTML = html;
+  } catch (e) {
+    console.error('Error cargando reseñas:', e);
+  }
+}
+
+function selectStar(rating) {
+  document.getElementById('selectedRating').value = rating;
+  document.querySelectorAll('.star-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i < rating);
+  });
+}
+
+async function submitReview(productId) {
+  const name = document.getElementById('reviewName').value;
+  const rating = parseInt(document.getElementById('selectedRating').value);
+  const text = document.getElementById('reviewText').value;
+  
+  if (!name || !text) {
+    alert('Por favor completa todos los campos');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API_URL}/api/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId, name, rating, text })
+    });
+    
+    if (res.ok) {
+      alert('¡Gracias por tu reseña!');
+      loadReviews(productId);
+      document.getElementById('reviewName').value = '';
+      document.getElementById('reviewText').value = '';
+      loadProducts();
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 // ADMIN
@@ -908,6 +1135,7 @@ async function downloadInvoice(orderId) {
 
 function showAddProduct() {
   document.getElementById('adminContent').innerHTML = `
+    <h3 style="color: #ffd700; margin-bottom: 20px;">Añadir nuevo producto</h3>
     <div class="form-group">
       <label>Nombre del producto</label>
       <input type="text" id="newProductName" placeholder="Ej: Spinner Magnético">
@@ -917,12 +1145,12 @@ function showAddProduct() {
       <input type="number" id="newProductPrice" placeholder="12.99" step="0.01">
     </div>
     <div class="form-group">
-      <label>Emoji/Icono</label>
-      <input type="text" id="newProductImage" placeholder="🎯" maxlength="2">
+      <label>URL de imagen</label>
+      <input type="url" id="newProductImage" placeholder="https://ejemplo.com/imagen.jpg">
     </div>
     <div class="form-group">
       <label>Descripción</label>
-      <input type="text" id="newProductDesc" placeholder="Descripción breve">
+      <input type="text" id="newProductDesc" placeholder="Descripción breve del producto">
     </div>
     <div class="form-group">
       <label>Stock</label>
